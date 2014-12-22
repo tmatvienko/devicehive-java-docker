@@ -1,4 +1,8 @@
-Script for dockerizing DeviceHive Java server
+Docker container for DeviceHive Java Server 
+================================
+You can check documentation for pulling DeviceHive Java Server Docker image on [DeviceHive Docker Hub Repository](https://registry.hub.docker.com/u/devicehive/devicehive-java/).
+
+Script for dockerizing DeviceHive Java Server
 =============================================
 
 Prerequisites:
