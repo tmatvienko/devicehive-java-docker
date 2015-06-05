@@ -10,15 +10,6 @@ fi
 if [[ "$PG_DATABASE" == "" ]]; then
     PG_DATABASE="dh"
 fi
-if [[ "$DH_DOMAIN" == "" ]]; then
-    DH_DOMAIN="localhost"
-fi
-if [[ "$DH_PORT" == "" ]]; then
-    DH_PORT="80"
-fi
-if [[ "$DH_PROTOCOL" == "" ]]; then
-    DH_PROTOCOL="http"
-fi
 
 if [[ "$POSTGRES_PORT_5432_TCP_ADDR" == "" ]]; then
     echo "You MUST link this container with postgres database"
@@ -37,7 +28,7 @@ sed -e "s/{PG_USER}/${PG_USER}/g" \
 /opt/glassfish4/glassfish/domains/domain1/config/domain.xml
 
 echo "Alter admin-console config"
-echo "app.config = {restEndpoint: '${DH_PROTOCOL}://${DH_DOMAIN}:${DH_PORT}/DeviceHive/rest', rootUrl: '/admin', pushState: false }" > \
+echo "app.config = {restEndpoint: '/DeviceHive/rest', rootUrl: '/admin', pushState: false }" > \
 /opt/glassfish4/glassfish/domains/domain1/docroot/admin/scripts/config.js
 
 echo "Starting glassfish server"
