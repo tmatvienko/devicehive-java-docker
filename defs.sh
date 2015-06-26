@@ -1,4 +1,4 @@
 #!/bin/bash
-DH_VERSION=1.3
-DH_DOCKER_NAME="devicehive/devicehive-java"
+DH_VERSION=2.0.1
+DH_DOCKER_NAME="devicehive/devicehive"
 
