@@ -1,35 +1,69 @@
 FROM ubuntu:14.04
-EXPOSE 22 2181 5432 6379 8080 9001 9092
-
 ENV DEBIAN_FRONTEND noninteractive
-RUN /bin/echo debconf shared/accepted-oracle-license-v1-1 select true | /usr/bin/debconf-set-selections
-RUN /bin/echo debconf shared/accepted-oracle-license-v1-1 seen true | /usr/bin/debconf-set-selections
-RUN apt-get update
-RUN apt-get install -y software-properties-common
-RUN add-apt-repository ppa:webupd8team/java
-RUN apt-get update
-RUN apt-get install -y unzip curl oracle-java8-installer openssh-server supervisor postgresql-9.3 psmisc procps redis-server git maven
 
-#postgresql
-RUN sed -i 's/^local.*all.*postgres.*peer$/local all postgres trust/' /etc/postgresql/9.3/main/pg_hba.conf
-RUN sed -i 's/^local.*all.*all.*peer$/local all all md5/' /etc/postgresql/9.3/main/pg_hba.conf
-RUN sed -i "s/#listen_addresses = 'localhost'/listen_addresses = '*'/" /etc/postgresql/9.3/main/postgresql.conf
-RUN echo "host all all 0.0.0.0/0 md5" >> /etc/postgresql/9.3/main/pg_hba.conf
+# Add the PostgreSQL PGP key to verify their Debian packages.
+# It should be the same key as https://www.postgresql.org/media/keys/ACCC4CF8.asc
+# Add PostgreSQL's repository. It contains the most recent stable release of PostgreSQL, ``9.4``.
+
+RUN apt-key adv --keyserver hkp://p80.pool.sks-keyservers.net:80 --recv-keys B97B0AFCAA1A47F044F244A07FCC7D46ACCC4CF8 && \
+    echo "deb http://apt.postgresql.org/pub/repos/apt/ precise-pgdg main" > /etc/apt/sources.list.d/pgdg.list
+
+# install java8 & postgres
+RUN apt-get update && \ 
+    apt-get install -y python-software-properties software-properties-common unzip curl openssh-server \
+    supervisor psmisc procps  postgresql-9.4 postgresql-client-9.4 postgresql-contrib-9.4 && \
+    /bin/echo debconf shared/accepted-oracle-license-v1-1 select true | /usr/bin/debconf-set-selections && \
+    /bin/echo debconf shared/accepted-oracle-license-v1-1 seen true | /usr/bin/debconf-set-selections && \
+    add-apt-repository ppa:webupd8team/java  && \
+    apt-get update  && \
+    apt-get install -y oracle-java8-installer && \
+    apt-get clean autoclean && \
+    apt-get autoremove -y && \
+    rm -rf /var/lib/{apt,dpkg,cache,log}/
+
+
+# Run the rest of the commands as the ``postgres`` user created by the ``postgres-9.3`` package when it was ``apt-get installed``
+USER postgres
+
+# Create a PostgreSQL role named ``dhadmin`` with ``dhadmin_#911`` as the password and
+# then create a database `dh` owned by the ``dhadmin`` role.
+# Note: here we use ``&&\`` to run commands one after the other - the ``\``
+#       allows the RUN command to span multiple lines.
+RUN /etc/init.d/postgresql start &&\
+    psql --command "CREATE USER dhadmin WITH SUPERUSER PASSWORD 'dhadmin_#911';" && \
+    createdb -O dhadmin dh
+
+# Adjust PostgreSQL configuration so that remote connections to the
+# database are possible. 
+RUN echo "host all  all    0.0.0.0/0  md5" >> /etc/postgresql/9.4/main/pg_hba.conf
+
+# And add ``listen_addresses`` to ``/etc/postgresql/9.4/main/postgresql.conf``
+RUN sed -i 's/^local.*all.*postgres.*peer$/local all postgres trust/' /etc/postgresql/9.4/main/pg_hba.conf && \
+    sed -i 's/^local.*all.*all.*peer$/local all all md5/' /etc/postgresql/9.4/main/pg_hba.conf && \
+    echo "listen_addresses='*'" >> /etc/postgresql/9.4/main/postgresql.conf
+
+# Add VOLUMEs to allow backup of config, logs and databases
+VOLUME  ["/etc/postgresql", "/var/log/postgresql", "/var/lib/postgresql"]
+
+# Return to root user
+USER root
 
 #zookeeper+kafka
-RUN curl -L -s http://mirror.reverse.net/pub/apache/kafka/0.8.2.0/kafka_2.10-0.8.2.0.tgz > /root/kafka_2.10-0.8.2.0.tgz
-RUN tar zxf /root/kafka_2.10-0.8.2.0.tgz -C /opt/ && rm /root/kafka_2.10-0.8.2.0.tgz
-RUN mv /opt/kafka_2.10-0.8.2.0 /opt/kafka
-RUN ln -s /opt/kafka /opt/zookeeper
-COPY zookeeper.properties /opt/zookeeper/config/zookeeper.properties
-RUN mkdir /opt/zk-data
-COPY server.properties /opt/kafka/config/server.properties
-RUN mkdir /opt/kafka-data
+ENV KAFKA_PARTITIONS 1
+RUN mkdir -p /opt/kafka/config && \
+    curl -L -s http://mirror.reverse.net/pub/apache/kafka/0.8.2.0/kafka_2.10-0.8.2.0.tgz \
+    | tar -xzC /opt/kafka/ && \
+    ln -s /opt/kafka /opt/zookeeper && \
+    echo num.partitions=$KAFKA_PARTITIONS >> /opt/kafka/config/kafka.properties
+COPY kafka.properties /opt/kafka/config/
+COPY zookeeper.properties /opt/kafka/config/
+# Add VOLUMEs to allow backup of config, logs and databases
+VOLUME  ["/var/data/zk-data", "/var/data/kafka-data", "/var/log/zk", "/var/log/kafka"]
 
 #supervisor sshd
 COPY supervisord.conf /etc/supervisor/conf.d/supervisord.conf
-RUN mkdir -p /var/run/sshd /var/log/supervisor
-RUN /bin/bash -c "echo -e \"\n[inet_http_server]\nport=*:9001\nusername=dhadmin\npassword={SHA}$(echo -n 'dhadmin_#911' | sha1sum | awk '{print $1}')\" >> /etc/supervisor/supervisord.conf"
+#RUN /bin/bash -c "echo -e \"\n[inet_http_server]\nport=*:9001\nusername=dhadmin\npassword={SHA}$(echo -n 'dhadmin_#911' | sha1sum | awk '{print $1}')\" >> /etc/supervisor/supervisord.conf"
+VOLUME ["/var/log/sshd", "/var/log/supervisor"]
 
 #start script
 COPY devicehive-init.sh /devicehive-init.sh
@@ -39,18 +73,11 @@ RUN chmod +x /devicehive-init.sh
 RUN useradd -m -s /bin/bash -G sudo dhadmin
 RUN usermod --password $(echo "dhadmin_#911" | openssl passwd -1 -stdin) dhadmin
 
-#redis
-RUN sed -i "s/daemonize yes/daemonize no/;s/^bind 127.0.0.1/# bind 127.0.0.1/" /etc/redis/redis.conf
-
-#building apps
-RUN git clone -b development https://github.com/devicehive/devicehive-java-server.git /home/devicehive-java-server
-RUN cd /home/devicehive-java-server && mvn -q clean package -DskipTests -Dserver.log.directory=/var/log
-RUN cp /home/devicehive-java-server/server/target/devicehive-boot.jar /root/
-RUN rm -rf /home/devicehive-java-server
-
-COPY application-docker.properties /home/application-docker.properties
-
-# Kafka partitions number
-ENV KAFKA_PARTITIONS 4
+#installing apps
+ADD https://github.com/devicehive/devicehive-java-server/releases/download/2.0.2-RC2/devicehive-2.0.2-SNAPSHOT-boot.jar /home/devicehive/
+COPY devicehive-server.properties /home/devicehive/devicehive-server.properties
+VOLUME ["/var/log/devicehive"]
 
 CMD ["/devicehive-init.sh"]
+
+EXPOSE 22 2181 5432 6379 8080 9001 9092 5701 5702
