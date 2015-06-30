@@ -3,7 +3,9 @@
 echo "Starting DeviceHive Components"
 /usr/bin/supervisord -c /etc/supervisor/supervisord.conf
 
-trap "{ supervisorctl stop devicehive; \
+trap "{ 
+	supervisorctl stop nginx; \
+	supervisorctl stop devicehive; \
 	supervisorctl stop kafka; \
 	supervisorctl stop postgresql; \
 	supervisorctl stop zookeeper;

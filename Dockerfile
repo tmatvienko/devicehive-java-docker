@@ -52,7 +52,8 @@ USER root
 ENV KAFKA_PARTITIONS 1
 RUN mkdir -p /opt/kafka/config && \
     curl -L -s http://mirror.reverse.net/pub/apache/kafka/0.8.2.0/kafka_2.10-0.8.2.0.tgz \
-    | tar -xzC /opt/kafka/ && \
+    | tar -xzC /tmp/ && \
+    mv -f /tmp/kafka_2.10-0.8.2.0/* /opt/kafka && \
     ln -s /opt/kafka /opt/zookeeper && \
     echo num.partitions=$KAFKA_PARTITIONS >> /opt/kafka/config/kafka.properties
 COPY kafka.properties /opt/kafka/config/
@@ -62,6 +63,7 @@ VOLUME  ["/var/data/zk-data", "/var/data/kafka-data", "/var/log/zk", "/var/log/k
 
 #supervisor sshd
 COPY supervisord.conf /etc/supervisor/conf.d/supervisord.conf
+RUN mkdir /var/run/sshd
 #RUN /bin/bash -c "echo -e \"\n[inet_http_server]\nport=*:9001\nusername=dhadmin\npassword={SHA}$(echo -n 'dhadmin_#911' | sha1sum | awk '{print $1}')\" >> /etc/supervisor/supervisord.conf"
 VOLUME ["/var/log/sshd", "/var/log/supervisor"]
 
@@ -73,11 +75,28 @@ RUN chmod +x /devicehive-init.sh
 RUN useradd -m -s /bin/bash -G sudo dhadmin
 RUN usermod --password $(echo "dhadmin_#911" | openssl passwd -1 -stdin) dhadmin
 
-#installing apps
-ADD https://github.com/devicehive/devicehive-java-server/releases/download/2.0.2-RC2/devicehive-2.0.2-SNAPSHOT-boot.jar /home/devicehive/
+#nginx
+RUN apt-get update && \
+    apt-get install -y ca-certificates nginx && \
+    apt-get clean autoclean && \
+    apt-get autoremove -y && \
+    rm -rf /var/lib/{apt,dpkg,cache,log}/
+
+COPY nginx.conf /etc/nginx/nginx.conf
+VOLUME ["/var/cache/nginx", "/var/log/nginx/"]
+
+#installing devicehive server
 COPY devicehive-server.properties /home/devicehive/devicehive-server.properties
+RUN mkdir -p /home/devicehive/admin && \
+    curl -L -s https://github.com/devicehive/devicehive-java-server/releases/download/2.0.2-RC3/devicehive-2.0.2-SNAPSHOT-boot.jar > /home/devicehive/devicehive-server.jar 
+
+#installing devicehive admin console
+RUN curl -L -s https://github.com/devicehive/devicehive-admin-console/archive/2.0.0.tar.gz \
+    | tar -xzC /tmp && \
+    cp -r /tmp/devicehive-admin-console-2.0.0/* /home/devicehive/admin/
+
 VOLUME ["/var/log/devicehive"]
 
 CMD ["/devicehive-init.sh"]
 
-EXPOSE 22 2181 5432 6379 8080 9001 9092 5701 5702
+EXPOSE 80 443 22 2181 5432 6379 8080 9001 9092 5701 5702
