@@ -4,7 +4,7 @@
 Image overview
 -----------
 
-With the exception of devicehive app there are several auxiliary services inside docker image - zookeeper, kafka, redis, postgresql. All of them work under the control of supervisord. Here is a summary table of internal services and network ports they use:
+With the exception of devicehive app there are several auxiliary services inside docker image - zookeeper, kafka, postgresql, ssh, nginx. All of them work under the control of supervisord. Here is a summary table of internal services and network ports they use:
 
     22 - sshd
     2181 - zookeeper
