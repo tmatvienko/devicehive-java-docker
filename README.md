@@ -16,7 +16,9 @@ With the exception of devicehive app there are several auxiliary services inside
 Default credentials
 -------------------------
 
-SSH, PostgreSQL, DeviceHive Admin, Supervisord Web Panel:   login=dhadmin, password=dhadmin_#911
+SSH, PostgreSQL, DeviceHive Admin, Supervisord Web Panel:
+     login=dhadmin
+     password=dhadmin_#911
 
 Usage
 -----------
