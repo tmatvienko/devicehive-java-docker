@@ -17,6 +17,7 @@ Default credentials
 -------------------------
 
 SSH, PostgreSQL, DeviceHive Admin, Supervisord Web Panel:
+
      login=dhadmin
      password=dhadmin_#911
 
