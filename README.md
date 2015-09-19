@@ -24,7 +24,7 @@ SSH, PostgreSQL, DeviceHive Admin, Supervisord Web Panel:
 Usage
 -----------
 
-     docker build -t devicehive
+     docker build -t devicehive .
      docker run -d --name=devicehive -p 80:80  -p 9001:9001 devicehive
 
 In about 1 minute 
