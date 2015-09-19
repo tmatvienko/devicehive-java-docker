@@ -91,9 +91,9 @@ RUN mkdir -p /home/devicehive/admin && \
     curl -L -s https://github.com/devicehive/devicehive-java-server/releases/download/2.0.3/devicehive-2.0.3-boot.jar > /home/devicehive/devicehive-server.jar 
 
 #installing devicehive admin console
-RUN curl -L -s https://github.com/devicehive/devicehive-admin-console/archive/2.0.1.tar.gz \
+RUN curl -L -s https://github.com/devicehive/devicehive-admin-console/archive/2.0.2.tar.gz \
     | tar -xzC /tmp && \
-    cp -r /tmp/devicehive-admin-console-2.0.1/* /home/devicehive/admin/
+    cp -r /tmp/devicehive-admin-console-2.0.2/* /home/devicehive/admin/
 
 VOLUME ["/var/log/devicehive"]
 
