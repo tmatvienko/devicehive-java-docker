@@ -40,7 +40,8 @@ RUN mkdir $PGDATA && echo "host all  all    0.0.0.0/0  md5" >> $PGDATA/pg_hba.co
 
 # And add ``listen_addresses`` to ``/etc/postgresql/9.4/main/postgresql.conf``
 RUN sed -i 's/^local.*all.*postgres.*peer$/local all postgres trust/' $PGDATA/pg_hba.conf && \
-    sed -i 's/^local.*all.*all.*peer$/local all all md5/' $PGDATA/pg_hba.conf
+    sed -i 's/^local.*all.*all.*peer$/local all all md5/' $PGDATA/pg_hba.conf && \
+    echo "listen_addresses='*'" >> $PGDATA/postgresql.conf
 
 # Add VOLUMEs to allow backup of config, logs and databases
 VOLUME  ["/var/log/postgresql", "/var/lib/postgresql/data"]
