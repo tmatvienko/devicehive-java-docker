@@ -1,0 +1,312 @@
+<html>
+  <head>
+  <meta http-equiv="content-type" content="text/html; charset=utf-8" />
+  <style type="text/css">
+    label {
+      width: 20%;
+      display: inline-block;
+    }
+    input {
+      width: 40%;
+      display: inline-block; 
+    }
+    H2 { font-family: sans-serif; text-align: center; color:grey; font-size:2.4em;}
+    H3 { font-family: sans-serif; text-align: center; color:darkgrey; font-size:1.4em;}
+    H4 { font-family: sans-serif; text-align: left; color:green; font-size:2em;}
+    .right { position: absolute; top: 0; right: 0; }
+  </style>
+  <title>DeviceHive - Esp8266 Demo</title>
+  <script type="text/javascript">
+  var SDA = 13;
+  var SCL = 12;
+  var DHTPIN = 2;
+  var BMPAddress = 0xEE;
+  var MPUAddress = 0xD0;
+  var pressure = 0;
+  var temperature = 0;
+  var humidity = 0;
+  var acX = 0;    
+  var acY = 0;    
+  var acZ = 0;      
+  var gyX = 0;    
+  var gyY = 0;    
+  var gyZ = 0;
+  var DH_ENDPOINT="http://94.18.248.108/api/rest"
+  var DH_DEVICEID="esp-device-ooh"
+  var DH_KEY="1jwKgLYi/CdfBTI9KByfYxwyQ6HUIEfnGSgakdpFjgk="
+
+  function print(text, color) {
+    document.body.innerHTML = "<font color=" + color + ">" + text + "</font>";
+  }
+  var data_printed = false;
+  function print_data() {// " +  + "<br>
+    if(data_printed == false) {
+      document.body.innerHTML = "<img width=322 height=100 src='da.jpg'><div class='right'><img width=322 height=100 src='dh.png'></div><br><br><h2>DeviceHive platfrom for IoT</h2><h3>This is HTML web page. It uses JavaScript for quering DevceHive cloud service. The same services is used by ESP8266 SoC with DeviceHive firmware which is connected to Wi-Fi network. Few sensors are connected to the chip. Sensor data displays below! </h3><div id='data'></div><h3>Hero you can also choose color for LED which is connected to the chip.</h3><h4><canvas id='rgb' width=680 height=30></canvas><br><font color=red>R:</font> <input type='range' id='r' min=0 max=100 onchange='rgbchanged()'><br><font color=green>G:</font> <input type='range' id='g' min=0 max=100 onchange='rgbchanged()'><br><font color=blue>B:</font> <input type='range' id='b' min=0 max=100 onchange='rgbchanged()'></h4><input type=button value=Red style='background-color:red' onclick='set_rgb(100, 0, 0)'><input type=button value=Green style='background-color:green' onclick='set_rgb(0, 100, 0)'><input type=button value=Blue style='background-color:blue' onclick='set_rgb(0, 0, 100)'><input type=button value=Yellow style='background-color:yellow' onclick='set_rgb(100, 100, 0)'><input type=button value=Cyan style='background-color:cyan' onclick='set_rgb(0, 100, 100)'><input type=button value=Magenta style='background-color:magenta' onclick='set_rgb(100, 0, 100)'>";
+      set_rgb(100,100,100);
+      data_printed = true; 
+    }
+    document.getElementById('data').innerHTML = "<h4>Temperature: " + temperature + "&#176;C<br>Atmospheric pressure: " + pressure + " kPa<br>Humidity: " + humidity + "%<br>Accelerometer: X = " +acX + "g Y = " + acY + "g Z = " + acZ + "g<br></h4>"; //Gyroscope: X = " + gyX + " &#176;/s Y = " + gyY + " &#176;/s Z = " + gyZ + " &#176;/s<br></h4>";
+  }
+
+  function createxmlhttp(method, path) {
+    var xmlhttp = new XMLHttpRequest();  
+    xmlhttp.open(method, DH_ENDPOINT + "/device/" + DH_DEVICEID + path, true);
+    xmlhttp.setRequestHeader("Authorization", "Bearer " + DH_KEY);
+    xmlhttp.setRequestHeader("Content-type", "application/json;charset=UTF-8");
+    return xmlhttp;
+  }
+  
+  function getres(id, callback) {
+    var xmlhttp = createxmlhttp("GET", "/command/" + id);
+    xmlhttp.onreadystatechange = function() {
+      if(xmlhttp.readyState == 4){
+          if(xmlhttp.status < 200 || xmlhttp.status> 299) {
+            print("ERROR: Command result returned " + xmlhttp.status + " " + xmlhttp.responseText, "red");
+          } else {
+            var json = JSON.parse(xmlhttp.responseText);
+            if(json['result'] == null || json['status'] == null) {
+              getres(id, callback);
+              return;
+            }
+            if(json['status'] != "OK") {
+              print("Error - " + xmlhttp.responseText, "red");
+              return;
+            }
+            callback(json['result']['data']);
+          }
+      }
+    }
+    xmlhttp.send("");
+  }
+  
+  function get_data(address, register, size, callback) {
+    var xmlhttp = createxmlhttp("POST", "/command");
+    xmlhttp.onreadystatechange = function() {
+        if(xmlhttp.readyState == 4){
+            if(xmlhttp.status < 200 || xmlhttp.status> 299) {
+              print("ERROR: Can not read data " + xmlhttp.status + " " + xmlhttp.responseText, "red");
+            } else {
+              getres(JSON.parse(xmlhttp.responseText)["id"], callback);
+            }
+          }
+        } 
+    xmlhttp.send(JSON.stringify({"command":"i2c/master/read", "parameters":{"SDA":SDA, "SCL":SCL, "address":"0x" + address.toString(16), "count":size, "data":btoa(String.fromCharCode(register))}}));
+  }
+  
+  function write_register(address, register, value, callback) {
+    var xmlhttp = createxmlhttp("POST", "/command");
+    xmlhttp.onreadystatechange = function() {
+        if(xmlhttp.readyState == 4){
+            if(xmlhttp.status < 200 || xmlhttp.status> 299) {
+              print("ERROR: Can not write register " + xmlhttp.status + " " + xmlhttp.responseText, "red");
+            } else {
+              getres(JSON.parse(xmlhttp.responseText)["id"], callback);
+            }
+          }
+        } 
+    data = btoa(String.fromCharCode(register) + String.fromCharCode(value));
+    xmlhttp.send(JSON.stringify({"command":"i2c/master/write", "parameters":{"SDA":SDA, "SCL":SCL, "address":"0x" + address.toString(16), "data":data}}));
+  }
+  
+  var oss = 0;
+  var ac1;
+  var ac2; 
+  var ac3; 
+  var ac4;
+  var ac5;
+  var ac6;
+  var b1; 
+  var b2;
+  var mb;
+  var mc;
+  var md;
+  var ut;
+  var up;
+  
+  function unsignedInt16(data, pos) {
+    return data.charCodeAt(pos) * 256 + data.charCodeAt(pos + 1);
+  }
+  function signedInt16(data, pos) {
+    i =  unsignedInt16(data, pos);
+    if( i <= 0x7FFF)
+      return i;
+    return i - 0x10000;
+  }
+  
+  function calibration_data_recevied(base64) {
+    var data = atob(base64);
+    ac1 = signedInt16(data, 0);
+    ac2 = signedInt16(data, 2);
+    ac3 = signedInt16(data, 4);
+    ac4 = unsignedInt16(data, 6);
+    ac5 = unsignedInt16(data, 8);
+    ac6 = unsignedInt16(data, 10);
+    b1 = signedInt16(data, 12);
+    b2 = signedInt16(data, 14);
+    mb = signedInt16(data, 16);
+    mc = signedInt16(data, 18);
+    md = signedInt16(data, 20);
+    cycle();
+  }
+  
+  function temperature_enable_cb(base64) {
+    setTimeout(function() { // we need to wait while sensor measure data, http request takes more time, but just in case
+        get_data(BMPAddress, 0xF6, 2, temerature_data_recevied);
+    }, 50);  
+  }
+  
+  function temerature_data_recevied(base64) {
+    var data = atob(base64);
+    ut = unsignedInt16(data, 0);
+    write_register(BMPAddress, 0xF4, 0x34, pressure_enable_cb)
+  }
+  
+  function pressure_enable_cb(base64) {
+    setTimeout(function() { // we need to wait while sensor measure data, http request takes more time, but just in case
+        get_data(BMPAddress, 0xF6, 2, pressure_data_recevied);
+    }, 50);  
+  }
+  
+  function pressure_data_recevied(base64) {
+    var data = atob(base64);
+    up = unsignedInt16(data, 0);
+    // now we have temperature, pressure and calibration data
+    // let's calculate real values using formulas from manufactor
+    x1 = (ut - ac6) * ac5 >> 15;
+    x2 = (mc << 11) / (x1 + md);
+    b5 = x1 + x2;
+    t  = (b5 + 8) >> 4;
+    temperature = (t / 10.0).toFixed(1);
+    
+   	b6 = b5 - 4000;
+    x1 = (b2 * ((b6 * b6) >> 12)) >> 11;
+    x2 = (ac2 * b6) >> 11;
+    x3 = x1 + x2;
+    b3 = (((ac1 * 4 + x3) << oss) + 2) >> 2;
+    x1 = (ac3 * b6) >> 13;
+    x2 = (b1 * ((b6 * b6) >> 12)) >> 16;
+    x3 = ((x1 + x2) + 2) >> 2;
+    b4 = (ac4 * (x3 + 32768)) >> 15;
+    b7 = ((up - b3) * (50000 >> oss));
+    p = b7 < 0x80000000 ? (b7 * 2) / b4 : (b7 / b4) * 2;
+    x1 = (p >> 8) * (p >> 8);
+    x1 = (x1 * 3038) >> 16;
+    x2 = (-7357 * p) >> 16;
+    p = p + ((x1 + x2 + 3791) >> 4);
+    pressure = (p / 100.0).toFixed(2); 
+ 
+    cycle();
+  }
+
+  function mpudata_recevied(base64) {
+    var data = atob(base64);
+    ac1g = 16384.0;
+    gyDS = 131.0;
+    acX = (signedInt16(data, 0)/ac1g).toFixed(2).toString();    
+    acY = (signedInt16(data, 2)/ac1g).toFixed(2).toString();    
+    acZ = (signedInt16(data, 4)/ac1g).toFixed(2).toString();    
+    //temperature = (signedInt16(data, 6)/340.00+36.53).toFixed(2).toString();    
+    gyX = (signedInt16(data, 8)/gyDS).toFixed(2).toString();    
+    gyY = (signedInt16(data, 10)/gyDS).toFixed(2).toString();    
+    gyZ = (signedInt16(data, 12)/gyDS).toFixed(2).toString();    
+    cycle();  
+  }
+
+  var dht22 = false;
+  function dht_data_recevied(base64) {
+    var data = atob(base64);
+    var cs = (data.charCodeAt(0) + data.charCodeAt(1) + data.charCodeAt(2) + data.charCodeAt(3)) & 0xFF;
+    if(cs != data.charCodeAt(4)) {
+      print("<h1>Wrong data checksum</h1>", "red");
+    } else {
+      deviceCode = "";
+      if(dht22) {
+        humidity = signedInt16(data, 0) / 10.0;
+        //temperature = signedInt16(data, 2) / 10.0;
+      } else {
+        humidity = data.charCodeAt(0);
+        //temperature = data.charCodeAt(2);
+      }
+    }
+    cycle();
+  }
+
+  function get_bmp_data() {
+      write_register(BMPAddress, 0xF4, 0x2E, temperature_enable_cb);
+  }
+
+ function get_dht_data() {
+    var xmlhttp = createxmlhttp("POST", "/command");
+    xmlhttp.onreadystatechange = function() {
+        if(xmlhttp.readyState == 4){
+            if(xmlhttp.status < 200 || xmlhttp.status> 299) {
+              print("ERROR: Can not read data " + xmlhttp.status + " " + xmlhttp.responseText, "red");
+            } else {
+              getres(JSON.parse(xmlhttp.responseText)["id"], dht_data_recevied);
+            }
+          }
+        } 
+    xmlhttp.send(JSON.stringify({"command":"onewire/dht/read", "parameters":{"pin":DHTPIN}}));
+  }
+
+  function get_mpu_data() {
+      get_data(MPUAddress, 0x3B, 14, mpudata_recevied);
+  }
+
+  var cycle_counter = 0;
+  var rgb_counter = 0;
+  var watchdog = 0;
+  function cycle() {
+      clearTimeout(watchdog);
+      watchdog = setTimeout(function() {
+        cycle();
+      }, 30000); 
+      cycle_counter++;
+      if(cycle_counter == 10) {
+          get_bmp_data();
+      } else if(cycle_counter == 20) {
+          cycle_counter = 0;
+          get_dht_data();
+      } else {
+          get_mpu_data();
+      }
+      print_data();
+  }
+
+  function init_bmp() {
+      get_data(BMPAddress, 0xAA, 22, calibration_data_recevied);
+  }
+  
+  function init_mpu() {
+      write_register(MPUAddress, 0x6B, 0x00, init_bmp);
+  }
+
+  function set_rgb(r, g, b) {
+    document.getElementById('r').value = r; 
+    document.getElementById('g').value = g;
+    document.getElementById('b').value = b;
+    var canvas = document.getElementById("rgb");
+    var cnvctx = canvas.getContext("2d");
+    cnvctx.rect(0,0, canvas.width, canvas.height);
+    cnvctx.fillStyle="#" + ("000000" + (((r*255/100) << 16) | ((g*255/100) << 8) | (b*255/100)).toString(16)).slice(-6);;
+    cnvctx.fill(); 
+    var xmlhttp = createxmlhttp("POST", "/command");
+    xmlhttp.send(JSON.stringify({"command":"pwm/control", "parameters":{"frequency":200, "15":r, "3":g, "1":b}}));
+  }
+
+  function rgbchanged() { 
+    r = document.getElementById('r').value;
+    g = document.getElementById('g').value;
+    b = document.getElementById('b').value;
+    set_rgb(r,g,b);
+  }
+  
+  function run(){ 
+    print("Connecting...", "black");
+    init_mpu();
+  }
+  </script>
+  </head>
+    <body onLoad="run();">  
+    </body>
+</html> 

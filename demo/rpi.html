@@ -1,0 +1,76 @@
+<html>
+  <head>
+  <style type="text/css">
+    input {
+      width: 40%;
+      display: inline-block; 
+    }
+    H2 { font-family: sans-serif; text-align: center; color:grey; font-size:2.4em;}
+    H3 { font-family: sans-serif; text-align: center; color:darkgrey; font-size:1.4em;}
+    H4 { font-family: sans-serif; text-align: left; color:green; font-size:2em;}
+    .right { position: absolute; top: 0; right: 0; }
+  </style>
+  <script type="text/javascript">
+
+  var DH_ENDPOINT="http://94.18.248.108/api/rest"
+  var DH_DEVICEID="rpi2"
+  var DH_KEY="1jwKgLYi/CdfBTI9KByfYxwyQ6HUIEfnGSgakdpFjgk="
+
+  function createxmlhttp(method, path) {
+    var xmlhttp = new XMLHttpRequest();  
+    xmlhttp.open(method, DH_ENDPOINT + "/device/" + DH_DEVICEID + path, true);
+    xmlhttp.setRequestHeader("Authorization", "Bearer " + DH_KEY);
+    xmlhttp.setRequestHeader("Content-type", "application/json;charset=UTF-8");
+    return xmlhttp;
+  }
+  
+  var lastTimestamp = '';
+  function poll() {
+       var path = '/notification/poll'; 
+       if(lastTimestamp != '')
+         path = path + '?timestamp=' + lastTimestamp;
+       var xmlhttp = createxmlhttp('GET', path)
+       xmlhttp.onreadystatechange = function() {
+         if(xmlhttp.readyState != 4)
+           return;
+         if(xmlhttp.status == 0)
+           return;
+         if(xmlhttp.status != 200)
+           alert('Last poll request return ' + xmlhttp.status);
+         var result = JSON.parse(xmlhttp.responseText);
+         result.forEach(function(myjson) {
+           if(myjson['notification'] != 'switch')
+             return;
+           document.getElementById('state').innerHTML = myjson['parameters']['state'];
+           lastTimestamp = myjson['timestamp'];
+         });
+         poll();
+       };
+       xmlhttp.send();
+     }
+     
+  function onOff(on) {
+    var xmlhttp = createxmlhttp("POST", "/command");
+    xmlhttp.send(JSON.stringify({"command":"lamp/"+(on?"on":"off"), "parameters":{}}));
+  }
+  
+  function run(){                  
+    poll();
+    onOff(false);
+  }
+
+  </script>
+  </head> 
+    <body onLoad="run();">
+      <img width=322 height=100 src='da.jpg'>
+      <div class='right'>
+          <img width=322 height=100 src='dh.png'>
+      </div>
+      <br><br>
+      <form name="form">
+        <h1><label>Current bulb state: </label><label id="state">Off</label></h1><br>
+        <input type="button" value="Turn On" onClick="onOff(true);">
+	<input type="button" value="Turn Off" onClick="onOff(false);"><br>
+      </form>   
+    </body>
+</html> 

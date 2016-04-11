@@ -87,13 +87,16 @@ VOLUME ["/var/cache/nginx", "/var/log/nginx/"]
 
 #installing devicehive server
 COPY devicehive-server.properties /home/devicehive/devicehive-server.properties
-RUN mkdir -p /home/devicehive/admin && \
-    curl -L -s https://github.com/devicehive/devicehive-java-server/releases/download/2.0.10/devicehive-2.0.10-boot.jar > /home/devicehive/devicehive-server.jar 
+COPY devicehive-java.jar /home/devicehive/devicehive-server.jar
+RUN mkdir -p /home/devicehive/admin
+RUN mkdir -p /home/devicehive/demo
+COPY demo/* /home/devicehive/demo/
 
 #installing devicehive admin console
 RUN curl -L -s https://github.com/devicehive/devicehive-admin-console/archive/2.0.4.tar.gz \
     | tar -xzC /tmp && \
     cp -r /tmp/devicehive-admin-console-2.0.4/* /home/devicehive/admin/
+RUN sed -i -e 's/restEndpoint.*/restEndpoint: location.origin + \"\/api\/rest\"\,/' /home/devicehive/admin/scripts/config.js
 
 VOLUME ["/var/log/devicehive"]
 
